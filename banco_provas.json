@@ -1,0 +1,7 @@
+[
+  {
+    "problema": "Prove que para todo inteiro n, n + 0 = n.",
+    "categoria": "Aritmetica",
+    "codigo_lean": "import Mathlib\n\ntheorem add_zero_int (n : ℤ) : n + 0 = n := by\n  simp"
+  }
+]
