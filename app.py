@@ -62,7 +62,7 @@ if st.button("Executar Agente", type="primary"):
             resultado = grafo_agente.invoke(estado_inicial)
             
         st.subheader("Código Lean Gerado:")
-        st.code(resultado.get("codigo_lean", ""), language="lean")
+        st.text(resultado.get("codigo_lean", ""))
         
         if resultado.get("sucesso"):
             st.success("✅ Prova validada com sucesso e salva no banco de memória!")
