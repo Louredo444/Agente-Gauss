@@ -93,4 +93,4 @@ def checar_senha():
 
 if checar_senha():
     # Todo o resto do código do app.py vem aqui dentro...
-    st.title("🧮 Agente Gauss - Provedor Lean 4")
+    st.title("Bem vindo!")

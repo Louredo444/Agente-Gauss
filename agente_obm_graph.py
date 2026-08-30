@@ -6,6 +6,39 @@ import sys
 import tempfile
 from typing import Dict, List, TypedDict
 
+import streamlit as st
+from dotenv import find_dotenv, load_dotenv
+from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_groq import ChatGroq
+from langgraph.graph import END, StateGraph
+
+# Tenta carregar a chave localmente (.env) ou pelas Secrets do Streamlit Cloud
+load_dotenv(find_dotenv(), override=True)
+groq_key = os.getenv("GROQ_API_KEY", "")
+
+if not groq_key and "GROQ_API_KEY" in st.secrets:
+    groq_key = st.secrets["GROQ_API_KEY"]
+
+groq_key = groq_key.strip()
+
+if not groq_key:
+    st.error("GROQ_API_KEY não foi encontrada nas Secrets nem no arquivo .env!")
+    sys.exit(1)
+
+# Inicializa o LLM
+llm = ChatGroq(
+    model_name="deepseek-r1-distill-llama-70b",
+    temperature=0.1,
+    groq_api_key=groq_key
+)
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from typing import Dict, List, TypedDict
+
 from dotenv import find_dotenv, load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -51,7 +84,7 @@ def me_carregar_memoria() -> List[Dict]:
 
 def me_salvar_prova_sucesso(problema: str, categoria: str, codigo_lean: str):
     memoria = me_carregar_memoria()
-    if any(item.get("problema") == problema for item in memoria):
+q    if any(item.get("problema") == problema for item in memoria):
         return
     memoria.append(
         {
@@ -202,3 +235,17 @@ if __name__ == "__main__":
     print("\n=== INICIANDO AGENTE OBM ===")
     out = app.invoke(init)
     print(f"\nSucesso: {out['sucesso']}\nCodigo:\n{out['codigo_lean']}")
+
+ SYSTEM_PROMPT = """
+Você é o Agente Gauss, um tutor e resolvedor especialista em Olimpíadas Avançadas de Matemática (OBM Nível 3, USAMO, IMO, Putnam).
+
+Diretrizes para geração e resolução de problemas:
+1. Estilo OBM/Olimpíada: Esqueça exercícios puramente operacionais de vestibular/ENEM. Foque em provas conceituais, construção de invariantes, geometria sintética avançada, teoria dos números e combinatória.
+2. Técnicas Avançadas: Empregue e reconheça técnicas clássicas de olimpíada, como:
+   - Geometria: Inversão geométrica, potência de ponto, coordenadas baricêntricas, homotetia, quadriláteros cíclicos e feixes harmônicos.
+   - Álgebra e Desigualdades: Cauchy-Schwarz, AM-GM, Hölder, Muirhead, polinômios sobre ℤ/ℚ.
+   - Teoria dos Números: Módulo, Teorema de Euler/Fermat, Ordens, Símbolo de Legendre, Equações Diofantinas.
+   - Combinatória: Princípio da Casa dos Pombos avançado, Contagem Dupla, Invariantes e Semi-invariantes, Teoria dos Grafos.
+3. Rigor Formal: Sempre forneça provas completas passo a passo ou, quando solicitado, a estrutura formalizada pronta para Lean 4 / Mathlib.
+4. Seja estremamente criativo e faça soluções intuitivas.
+"""
