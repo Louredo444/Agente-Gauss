@@ -3,7 +3,6 @@ import sys
 import time
 import json
 import logging
-import datetime
 from typing import List, Literal
 from pydantic import BaseModel, Field, ValidationError
 from langchain_groq import ChatGroq
@@ -18,7 +17,6 @@ logging.basicConfig(
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 ARQUIVO_BANCO = "banco_provas.json"
 
-# Schema Pydantic para validação estrita
 class ProblemaOlimpiada(BaseModel):
     id: str = Field(..., description="ID no formato COMPETICAO_ANO_NUMERO")
     competicao: str
@@ -76,8 +74,6 @@ def processar_com_validacao(llm, texto_bruto: str) -> dict:
             conteudo = conteudo[:-3]
             
         dados_dict = json.loads(conteudo.strip())
-        
-        # Validação Pydantic
         problema_validado = ProblemaOlimpiada(**dados_dict)
         return problema_validado.model_dump()
     except ValidationError as ve:
@@ -92,7 +88,6 @@ def executar_ciclo(llm):
     banco = carregar_banco()
     ids_existentes = {item.get("id") for item in banco if "id" in item}
 
-    # Fila de ingestão (entradas brutas ou capturadas via scraping)
     entradas_brutas = [
         "OBM 2023 Nível 3 P1: Seja ABCD um quadrilátero cíclico...",
         "IMO 2022 P1: Determine todas as funções f: R -> R..."
@@ -114,12 +109,29 @@ def executar_ciclo(llm):
         salvar_banco(banco)
 
 def main():
+    logging.info("=== INICIANDO AGENTE LAGRANGE (MODO RESILIENTE 24 HORAS) ===")
+    
     if not GROQ_API_KEY:
-        logging.error("GROQ_API_KEY ausente.")
+        logging.error("GROQ_API_KEY não encontrada nas variáveis de ambiente. Encerrando.")
         sys.exit(1)
-        
+
     llm = ChatGroq(model_name="llama-3.3-70b-versatile", groq_api_key=GROQ_API_KEY)
-    executar_ciclo(llm)
+    
+    tempo_inicio = time.time()
+    duracao_maxima = 86400  # 24 horas em segundos
+    intervalo_loop = 3600   # 1 hora entre as execuções
+    
+    while (time.time() - tempo_inicio) < duracao_maxima:
+        try:
+            logging.info("Executando ciclo de ingestão...")
+            executar_ciclo(llm)
+        except Exception as e:
+            logging.error(f"❌ Ocorreu uma falha no ciclo atual: {e}. O Lagrange continuará ativo.")
+
+        logging.info(f"Aguardando {intervalo_loop // 60} minutos para o próximo ciclo...")
+        time.sleep(intervalo_loop)
+
+    logging.info("=== FIM DA EXECUÇÃO DE 24 HORAS DO LAGRANGE ===")
 
 if __name__ == "__main__":
     main()
