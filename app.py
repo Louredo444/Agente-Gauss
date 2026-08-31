@@ -62,10 +62,9 @@ Sempre que receber um enunciado, link ou documento (PDF/TXT), sua resposta final
   "fonte_url": "URL original ou 'Inserção Manual/PDF'",
   "tags": ["LaTeX Validado"]
 }
-
 """
 #------------------------------------------------------------------
-#SISTEMA DE AUTENTICAÇÃO
+# SISTEMA DE AUTENTICAÇÃO
 #------------------------------------------------------------------
 
 def checar_senha():
