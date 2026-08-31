@@ -19,11 +19,38 @@ Sua missão é extrair, higienizar, categorizar e formatar enunciados, soluçõe
 
 FONTES: AoPS, OBM/SBM, IMO e Shortlists.
 
-REGRAS:
+REGRAS DE PROCESSAMENTO:
 1. LaTeX: Inline com $...$ e Bloco com $$...$$.
-2. Categorias: Algebra, Combinatoria, Geometria, Teoria dos Numeros.
-3. Saída estritamente em JSON.
+2. Categorias permitidas: Algebra, Combinatoria, Geometria, Teoria dos Numeros.
+3. A saída DEVE ser estritamente um bloco JSON válido no seguinte formato:
+
+{
+  "id": "COMPETICAO_ANO_NUMERO",
+  "competicao": "Nome da Competição",
+  "ano": 2024,
+  "fase_ou_nivel": "Fase / Nível / Shortlist",
+  "categoria": "Algebra",
+  "topicos": ["Tópico 1"],
+  "dificuldade_estimada": "Média",
+  "enunciado": "Texto em LaTeX",
+  "solucao": "Solução em LaTeX",
+  "fonte_url": "URL ou Inserção Manual",
+  "tags": ["Tag1"]
+}
 """
+
+def carregar_banco(caminho):
+    if os.path.exists(caminho):
+        try:
+            with open(caminho, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def salvar_banco(caminho, dados):
+    with open(caminho, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
 
 def checar_senha():
     if "autenticado" not in st.session_state:
@@ -44,8 +71,8 @@ def checar_senha():
 if checar_senha():
     groq_api_key = os.getenv("GROQ_API_KEY")
     llm = ChatGroq(model_name="llama-3.3-70b-versatile", groq_api_key=groq_api_key) if groq_api_key else None
+    caminho_banco = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banco_provas.json")
 
-    # Estrutura com 5 Abas
     aba_lean, aba_gauss, aba_lagrange, aba_banco, aba_controle = st.tabs([
         "📐 Provedor Lean 4", 
         "💬 Gauss (Tutor)", 
@@ -54,7 +81,6 @@ if checar_senha():
         "⚙️ Painel de Controle"
     ])
 
-    # Barra Lateral
     with st.sidebar:
         st.header("📚 Base de Conhecimento")
         arquivos_carregados = st.file_uploader(
@@ -139,7 +165,7 @@ if checar_senha():
             else:
                 st.warning("Digite o enunciado.")
 
-    # ABA 2: GAUSS (Tutor)
+    # ABA 2: GAUSS
     with aba_gauss:
         st.header("Gauss - Tutor OBM & IMO")
         if "messages_gauss" not in st.session_state:
@@ -155,7 +181,7 @@ if checar_senha():
                 st.markdown(prompt)
 
             if llm:
-                system_gauss = SystemMessage(content="Você é o Gauss, tutor especialista em OBM/IMO. Use LaTeX ($ e $$).")
+                system_gauss = SystemMessage(content="Você é o Gauss, tutor especialista em OBM/IMO. Use LaTeX ($e$$).")
                 historia = [system_gauss] + [
                     HumanMessage(content=m["content"]) if m["role"] == "user" else SystemMessage(content=m["content"])
                     for m in st.session_state.messages_gauss
@@ -165,45 +191,76 @@ if checar_senha():
                     st.markdown(resposta.content)
                     st.session_state.messages_gauss.append({"role": "assistant", "content": resposta.content})
 
-    # ABA 3: LAGRANGE (Ingestor)
+    # ABA 3: LAGRANGE (Ingestão com Aprovação Manual)
     with aba_lagrange:
         st.header("Lagrange - Ingestor de Dados")
-        if "messages_lagrange" not in st.session_state:
-            st.session_state.messages_lagrange = []
+        st.caption("Insira problemas para estruturação. O salvamento só ocorre após sua confirmação.")
 
-        for msg in st.session_state.messages_lagrange:
-            with st.chat_message(msg["role"]):
-                st.markdown(msg["content"])
+        if "ultimo_json_processado" not in st.session_state:
+            st.session_state.ultimo_json_processado = None
 
-        if prompt_lagrange := st.chat_input("Cole o problema bruto...", key="input_chat_lagrange"):
-            st.session_state.messages_lagrange.append({"role": "user", "content": prompt_lagrange})
-            with st.chat_message("user"):
-                st.markdown(prompt_lagrange)
+        if prompt_lagrange := st.chat_input("Cole o texto do problema...", key="input_chat_lagrange"):
+            if not llm:
+                st.error("GROQ_API_KEY não configurada.")
+            else:
+                with st.spinner("Estruturando problema..."):
+                    system_lagrange = SystemMessage(content=SYSTEM_PROMPT_LAGRANGE)
+                    resposta_lag = llm.invoke([system_lagrange, HumanMessage(content=prompt_lagrange)])
+                    conteudo = resposta_lag.content.strip()
 
-            if llm:
-                system_lagrange = SystemMessage(content=SYSTEM_PROMPT_LAGRANGE)
-                historia_lagrange = [system_lagrange] + [
-                    HumanMessage(content=m["content"]) if m["role"] == "user" else SystemMessage(content=m["content"])
-                    for m in st.session_state.messages_lagrange
-                ]
-                with st.chat_message("assistant"):
-                    resposta_lag = llm.invoke(historia_lagrange)
-                    st.markdown(resposta_lag.content)
-                    st.session_state.messages_lagrange.append({"role": "assistant", "content": resposta_lag.content})
+                    if conteudo.startswith("```json"):
+                        conteudo = conteudo[7:]
+                    if conteudo.startswith("```"):
+                        conteudo = conteudo[3:]
+                    if conteudo.endswith("```"):
+                        conteudo = conteudo[:-3]
 
-    # ABA 4: BANCO DE PROVAS (NOVA)
+                    try:
+                        dados_json = json.loads(conteudo.strip())
+                        st.session_state.ultimo_json_processado = dados_json
+                    except Exception as e:
+                        st.error("Erro ao converter resposta em JSON formatado.")
+                        st.text(resposta_lag.content)
+
+        if st.session_state.ultimo_json_processado:
+            item = st.session_state.ultimo_json_processado
+            st.subheader("📋 Resolução Gerada para Revisão")
+            st.markdown(f"**ID:** `{item.get('id')}` | **Competição:** {item.get('competicao')} ({item.get('ano')})")
+            st.markdown(f"**Categoria:** `{item.get('categoria')}` | **Dificuldade:** {item.get('dificuldade_estimada')}")
+            st.markdown("**Enunciado:**")
+            st.markdown(item.get("enunciado", ""))
+            st.markdown("**Solução:**")
+            st.markdown(item.get("solucao", ""))
+
+            col_salvar, col_descartar = st.columns([1, 1])
+            with col_salvar:
+                if st.button("💾 Salvar Solução no Banco", type="primary"):
+                    banco = carregar_banco(caminho_banco)
+                    if any(p.get("id") == item.get("id") for p in banco):
+                        st.warning("Este ID já existe no banco de dados.")
+                    else:
+                        banco.append(item)
+                        salvar_banco(caminho_banco, banco)
+                        st.success("✅ Problema e solução salvos no banco com sucesso!")
+                        st.session_state.ultimo_json_processado = None
+                        st.rerun()
+
+            with col_descartar:
+                if st.button("❌ Descartar Resolução"):
+                    st.session_state.ultimo_json_processado = None
+                    st.info("Resolução descartada.")
+                    st.rerun()
+
+    # ABA 4: BANCO DE PROVAS (Com Remoção 1 a 1)
     with aba_banco:
         st.header("📂 Banco de Provas Ingeridas")
-        caminho_banco = os.path.join(os.path.dirname(os.path.abspath(__file__)), "banco_provas.json")
+        provas = carregar_banco(caminho_banco)
         
-        if os.path.exists(caminho_banco):
-            with open(caminho_banco, "r", encoding="utf-8") as f:
-                provas = json.load(f)
-                
-            st.metric("Total de Problemas", len(provas))
+        if provas:
+            st.metric("Total de Problemas Salvos", len(provas))
             categoria_filtro = st.selectbox("Filtrar por Categoria:", ["Todas", "Algebra", "Combinatoria", "Geometria", "Teoria dos Numeros"])
             
-            for item in provas:
+            for idx, item in enumerate(provas):
                 if categoria_filtro == "Todas" or item.get("categoria") == categoria_filtro:
                     with st.expander(f"📌 {item.get('id', 'Sem ID')} - {item.get('competicao', '')} ({item.get('ano', '')})"):
                         st.markdown(f"**Categoria:** `{item.get('categoria')}` | **Dificuldade:** {item.get('dificuldade_estimada')}")
@@ -212,6 +269,13 @@ if checar_senha():
                         st.markdown("**Solução:**")
                         st.markdown(item.get("solucao", ""))
                         
+                        if st.button(f"🗑️ Remover este problema", key=f"btn_remove_{idx}_{item.get('id')}"):
+                            provas.pop(idx)
+                            salvar_banco(caminho_banco, provas)
+                            st.success(f"Problema {item.get('id')} removido com sucesso!")
+                            st.rerun()
+            
+            st.divider()
             st.download_button(
                 label="📥 Baixar banco_provas.json",
                 data=json.dumps(provas, ensure_ascii=False, indent=2),
@@ -219,9 +283,9 @@ if checar_senha():
                 mime="application/json"
             )
         else:
-            st.info("Nenhum banco de provas encontrado. Execute o Lagrange para alimentar os dados.")
+            st.info("Nenhum problema no banco. Utilize a aba Lagrange para aprovar e salvar novas soluções.")
 
-    # ABA 5: PAINEL DE CONTROLE E LOGS
+    # ABA 5: PAINEL DE CONTROLE
     with aba_controle:
         st.header("Automação de Raspagem (Lagrange)")
         diretorio_atual = os.path.dirname(os.path.abspath(__file__))
