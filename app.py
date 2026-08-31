@@ -141,3 +141,125 @@ def rodar_ingestao():
 
 if __name__ == "__main__":
     rodar_ingestao()
+
+import streamlit as st
+import subprocess
+import os
+import json
+from langchain_core.messages import HumanMessage, SystemMessage
+# Importe aqui a chamada do seu modelo / grafo (ex: llm do Groq)
+from langchain_groq import ChatGroq
+
+st.set_page_config(page_title="Agente Gauss & Ingestor", page_icon="🧮", layout="wide")
+
+# Configuração do modelo Groq
+groq_api_key = os.getenv("GROQ_API_KEY")
+llm = ChatGroq(model_name="llama-3.3-70b-versatile", groq_api_key=groq_api_key)
+
+# ------------------------------------------------------------------
+# CRIAÇÃO DAS ABAS DA INTERFACE
+# ------------------------------------------------------------------
+aba_gauss, aba_ingestor, aba_controle = st.tabs([
+    "💬 Agente Gauss (Tutor OBM/IMO)", 
+    "🤖 Agente Ingestor", 
+    "⚙️ Painel de Controle (24h)"
+])
+
+# ==================================================================
+# ABA 1: AGENTE GAUSS (Tutor de Estatísticas e Resolução OBM/IMO)
+# ==================================================================
+with aba_gauss:
+    st.header("Agente Gauss - Tutor OBM & IMO Shortlist")
+    st.caption("Converse sobre os tópicos mais recorrentes, estratégias de prova e resoluções de alto nível.")
+
+    # Inicializa o histórico de chat do Gauss
+    if "messages_gauss" not in st.session_state:
+        st.session_state.messages_gauss = []
+
+    # Exibe mensagens anteriores
+    for msg in st.session_state.messages_gauss:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    # Input do usuário
+    if prompt := st.chat_input("Pergunte sobre os assuntos mais cobrados ou peça a resolução de um problema..."):
+        st.session_state.messages_gauss.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+
+        # System Prompt focado em análise de tendências OBM/IMO e resoluções
+        system_gauss = SystemMessage(content="""
+        Você é o Agente Gauss, um tutor e estatístico especialista em OBM (Nível 3/Universitário) e IMO Shortlists.
+        Você domina a frequência dos tópicos mais cobrados (ex: Geometria Sintética/Inversão, Equações Funcionais, LTE, Teoria dos Grafos, Invariantes).
+        Ao conversar com o usuário:
+        1. Responda com base nas tendências reais de provas da OBM e IMO.
+        2. Use a sintaxe LaTeX ($ ... $ para inline e $$ ... $$ para bloco) para qualquer fórmula ou equação.
+        3. Mantenha o tom de um treinador olímpico de nível medalha de ouro.
+        """)
+
+        historia = [system_gauss] + [
+            HumanMessage(content=m["content"]) if m["role"] == "user" else SystemMessage(content=m["content"])
+            for m in st.session_state.messages_gauss
+        ]
+
+        with st.chat_message("assistant"):
+            resposta = llm.invoke(historia)
+            st.markdown(resposta.content)
+            st.session_state.messages_gauss.append({"role": "assistant", "content": resposta.content})
+
+# ==================================================================
+# ABA 2: AGENTE INGESTOR (Conversa sobre raspagem e inserção manual)
+# ==================================================================
+with aba_ingestor:
+    st.header("Agente Ingestor de Dados")
+    st.caption("Envie URLs do AoPS/OBM ou trechos de provas para o ingestor estruturar e salvar no banco_provas.json.")
+
+    if "messages_ingestor" not in st.session_state:
+        st.session_state.messages_ingestor = []
+
+    for msg in st.session_state.messages_ingestor:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt_ingestor := st.chat_input("Cole uma URL do AoPS ou o texto bruto de um problema para ser ingerido...", key="input_ingestor"):
+        st.session_state.messages_ingestor.append({"role": "user", "content": prompt_ingestor})
+        with st.chat_message("user"):
+            st.markdown(prompt_ingestor)
+
+        system_ingestor = SystemMessage(content="""
+        Você é o Assistente do Agente Ingestor.
+        Sua função é receber links, enunciados ou soluções brutas enviadas pelo usuário, formatá-los no padrão JSON do banco de provas da OBM/IMO e confirmar o processamento.
+        Sempre retorne o código JSON formatado com tags do problema (Categoria, Tópicos, Competicao, Ano, Enunciado em LaTeX, Solucao em LaTeX).
+        """)
+
+        historia_ingestor = [system_ingestor] + [
+            HumanMessage(content=m["content"]) if m["role"] == "user" else SystemMessage(content=m["content"])
+            for m in st.session_state.messages_ingestor
+        ]
+
+        with st.chat_message("assistant"):
+            resposta_ing = llm.invoke(historia_ingestor)
+            st.markdown(resposta_ing.content)
+            st.session_state.messages_ingestor.append({"role": "assistant", "content": resposta_ing.content})
+
+# ==================================================================
+# ABA 3: PAINEL DE CONTROLE DO INGESTOR AUTOMÁTICO (24 HORAS)
+# ==================================================================
+with aba_controle:
+    st.header("Automação de Raspagem de Dados")
+    st.write("Inicie o processo automático em segundo plano para varrer o AoPS e bancos de provas durante 24 horas consecutivas.")
+
+    if st.button("🚀 Iniciar Ingestor Automático (24 Horas)"):
+        comando = "nohup timeout 86400s python3 ingestor.py > ingestor.log 2>&1 &"
+        try:
+            subprocess.Popen(comando, shell=True)
+            st.success("✅ Ingestor iniciado em segundo plano! Ele rodará por 24 horas seguidas.")
+        except Exception as e:
+            st.error(f"❌ Erro ao iniciar processo: {e}")
+
+    st.subheader("Logs de Execução")
+    if os.path.exists("ingestor.log"):
+        with open("ingestor.log", "r", encoding="utf-8") as f:
+            st.code(f.read()[-2000:], language="bash")
+    else:
+        st.info("Nenhum log gerado até o momento.")
