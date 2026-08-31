@@ -84,7 +84,7 @@ def me_carregar_memoria() -> List[Dict]:
 
 def me_salvar_prova_sucesso(problema: str, categoria: str, codigo_lean: str):
     memoria = me_carregar_memoria()
-q    if any(item.get("problema") == problema for item in memoria):
+    if any(item.get("problema") == problema for item in memoria):
         return
     memoria.append(
         {

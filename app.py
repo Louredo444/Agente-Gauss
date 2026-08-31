@@ -4,10 +4,10 @@ import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.messages import HumanMessage, SystemMessage
 
-# Tenta importar o grafo do Lean 4 se existir no projeto
+# Importação segura para evitar SyntaxError caso agente_obm_graph esteja com falhas
 try:
     from agente_obm_graph import app as grafo_agente
-except ImportError:
+except Exception as e:
     grafo_agente = None
 
 st.set_page_config(page_title="Gauss & Lagrange", page_icon="🧮", layout="wide")
