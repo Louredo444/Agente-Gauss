@@ -64,9 +64,9 @@ Sempre que receber um enunciado, link ou documento (PDF/TXT), sua resposta final
 }
 
 """
-------------------------------------------------------------------
-SISTEMA DE AUTENTICAÇÃO
-------------------------------------------------------------------
+#------------------------------------------------------------------
+#SISTEMA DE AUTENTICAÇÃO
+#------------------------------------------------------------------
 
 def checar_senha():
 if "autenticado" not in st.session_state:
