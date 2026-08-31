@@ -226,3 +226,17 @@ if checar_senha():
                 st.code(f.read()[-2000:], language="bash")
         else:
             st.info("Nenhum log gerado até o momento.")
+
+# Na Aba de Painel de Controle (app.py)
+if st.button("🚀 Iniciar Lagrange Automático (24 Horas)"):
+    # Obtém o caminho absoluto do diretório onde o app.py está rodando
+    diretorio_atual = os.path.dirname(os.path.abspath(__file__))
+    caminho_ingestor = os.path.join(diretorio_atual, "ingestor.py")
+    caminho_log = os.path.join(diretorio_atual, "ingestor.log")
+    
+    comando = f"nohup timeout 86400s python3 {caminho_ingestor} > {caminho_log} 2>&1 &"
+    try:
+        subprocess.Popen(comando, shell=True)
+        st.success("✅ Lagrange iniciado em segundo plano! Ele rodará por 24 horas seguidas.")
+    except Exception as e:
+        st.error(f"❌ Erro ao iniciar processo: {e}")
