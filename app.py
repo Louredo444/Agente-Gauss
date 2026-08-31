@@ -94,3 +94,50 @@ def checar_senha():
 if checar_senha():
     # Todo o resto do código do app.py vem aqui dentro...
     st.title("Bem vindo!")
+
+# Opção 1: Renderização direta via st.latex (ideal para equações puras)
+st.subheader("Solução Formatada (LaTeX):")
+st.latex(resultado.get("solucao", ""))
+
+# Opção 2: Renderização via Markdown (compila texto normal + equações $ ... $ ou $$ ... $$)
+st.markdown(resultado.get("solucao", ""))
+
+import streamlit as st
+import subprocess
+import os
+
+st.title("Painel de Controle do Agente Gauss")
+
+# Botão para disparar o ingestor por 24h
+if st.button("🚀 Iniciar Ingestor (Rodar por 24 horas)"):
+    # Comando bash que executa o script com limite de tempo de 1 dia (86400 segundos)
+    # O 'nohup' e o '&' garantem que o processo rode em segundo plano sem travar o Streamlit
+    comando = "nohup timeout 86400s python3 ingestor.py > ingestor.log 2>&1 &"
+    
+    try:
+        subprocess.Popen(comando, shell=True)
+        st.success("✅ Ingestor iniciado com sucesso em segundo plano! Ele será executado durante 24 horas.")
+        st.info("Você pode fechar a página. O processo continuará rodando no servidor.")
+    except Exception as e:
+        st.error(f"❌ Erro ao iniciar o ingestor: {e}")
+
+# Opção para visualizar os logs da execução em tempo real
+if st.checkbox("📋 Mostrar logs do Ingestor"):
+    if os.path.exists("ingestor.log"):
+        with open("ingestor.log", "r", encoding="utf-8") as f:
+            st.code(f.read()[-2000:], language="bash") # Exibe os últimos 2000 caracteres
+    else:
+        st.write("Nenhum log encontrado ainda.")
+
+import time
+
+def rodar_ingestao():
+    while True:
+        print("Iniciando varredura de novas questões...")
+        # Lógica de raspagem e atualização do banco_provas.json aqui
+        
+        # Aguarda 30 minutos antes de buscar novamente
+        time.sleep(1800)
+
+if __name__ == "__main__":
+    rodar_ingestao()
