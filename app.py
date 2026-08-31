@@ -262,25 +262,25 @@ if checar_senha():
         st.header("Automação de Raspagem (Lagrange)")
         st.write("Inicie o processo automático em segundo plano para varrer o AoPS e bancos de provas durante 24 horas consecutivas.")
 
+        diretorio_atual = os.path.dirname(os.path.abspath(__file__))
+        caminho_ingestor = os.path.join(diretorio_atual, "ingestor.py")
+
         if st.button("🚀 Iniciar Lagrange Automático (24 Horas)", key="btn_run_lagrange_24h"):
-            diretorio_atual = os.path.dirname(os.path.abspath(__file__))
-            caminho_ingestor = os.path.join(diretorio_atual, "ingestor.py")
-            caminho_log = os.path.join(diretorio_atual, "ingestor.log")
-            
-            comando = f"nohup timeout 86400s python3 {caminho_ingestor} > {caminho_log} 2>&1 &"
-            try:
-                subprocess.Popen(comando, shell=True)
-                st.success("✅ Lagrange iniciado em segundo plano! Ele rodará por 24 horas seguidas.")
-            except Exception as e:
-                st.error(f"❌ Erro ao iniciar processo: {e}")
+            if not os.path.exists(caminho_ingestor):
+                st.error("❌ O arquivo `ingestor.py` não foi encontrado na raiz do projeto.")
+            else:
+                caminho_log = os.path.join(diretorio_atual, "ingestor.log")
+                comando = f"nohup timeout 86400s python3 {caminho_ingestor} > {caminho_log} 2>&1 &"
+                try:
+                    subprocess.Popen(comando, shell=True)
+                    st.success("✅ Lagrange iniciado em segundo plano! Ele rodará por 24 horas seguidas.")
+                except Exception as e:
+                    st.error(f"❌ Erro ao iniciar processo: {e}")
 
         st.subheader("Logs de Execução do Lagrange")
-        caminho_log = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ingestor.log")
+        caminho_log = os.path.join(diretorio_atual, "ingestor.log")
         if os.path.exists(caminho_log):
             with open(caminho_log, "r", encoding="utf-8") as f:
-                st.code(f.read()[-2000:], language="bash")
-        elif os.path.exists("ingestor.log"):
-            with open("ingestor.log", "r", encoding="utf-8") as f:
                 st.code(f.read()[-2000:], language="bash")
         else:
             st.info("Nenhum log gerado até o momento.")
